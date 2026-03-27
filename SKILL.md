@@ -148,6 +148,40 @@ See `references/prompting-guide.md` for advanced techniques and examples.
 | Flash Attention 3 | ~20% | Hopper GPUs, auto-detected |
 | Gradient estimation | Reduce steps 40 to 20 | `--gradient_estimation` |
 
+## Apple Silicon (MLX)
+
+LTX-2 runs on Apple Silicon via MLX-native ports or the MPS PyTorch backend. Q4 quantized
+models fit on 24 GB machines; full precision needs 64 GB+. Pin PyTorch to 2.4.1 for MPS
+(2.5+ has Conv3d regression). See `references/apple-silicon.md` for setup, patches, and memory tables.
+
+## Cloud API
+
+Use hosted APIs when local hardware is insufficient: LTX API ($0.04-0.08/sec, official),
+fal.ai (~$0.20/video), or Replicate (~$0.10/run). For self-hosted cloud, RunPod H100 runs
+at ~$2.49/hr and Vast.ai from ~$0.50/hr. See `references/cloud-api.md` for Python examples and cost comparison.
+
+## Low-VRAM CUDA (12 GB)
+
+Run LTX-2 on 12 GB GPUs (RTX 4070, 3060 12GB) by combining three techniques:
+
+1. **FP8 quantization** (`--quantization fp8-cast`) -- reduces model memory ~40%
+2. **Distilled model** (`ltx-2.3-22b-distilled`) -- 8 fixed steps instead of 40, lower peak VRAM
+3. **Single-stage pipeline** (`TI2VidOneStagePipeline` or `DistilledPipeline`) -- avoids loading the spatial upscaler
+
+```bash
+python -m ltx_pipelines.run \
+  --config configs/ltx-2.3-22b-distilled-1stage.yaml \
+  --quantization fp8-cast \
+  --prompt "A cat sitting on a windowsill watching rain" \
+  --height 480 --width 832 \
+  --num_frames 33 \
+  --output output.mp4
+```
+
+At 480x832 with 33 frames, this fits comfortably in 12 GB. Increase resolution or frame
+count only if monitoring shows headroom. Adding xFormers (`pip install xformers`) saves
+another ~15% VRAM when available.
+
 ## LoRA & Fine-Tuning
 
 Train custom LoRAs in <1 hour for motion, style, or likeness:
